@@ -11,6 +11,19 @@ SERVER = "./mini_serv"
 SOURCE = "mini_serv.c"
 
 # ─────────────────────────────────────────────
+# Output mode
+#
+# Default mode prints only one-line results (✅/❌/⚠).
+# Verbose mode (-v/--verbose) also prints section headers, server info,
+# and the long-line debug dump.
+# ─────────────────────────────────────────────
+VERBOSE = any(a in ("-v", "--verbose") for a in sys.argv[1:])
+
+def vprint(*args, **kwargs):
+    if VERBOSE:
+        print(*args, **kwargs)
+
+# ─────────────────────────────────────────────
 # Find available port 
 # ─────────────────────────────────────────────
 def find_available_port(start=8888, end=9999):
@@ -69,14 +82,14 @@ def check_forbidden_functions(source_file):
 # ─────────────────────────────────────────────
 # Compile and count lines
 # ─────────────────────────────────────────────
-print(f"Checking {SOURCE} for forbidden functions...")
+vprint(f"Checking {SOURCE} for forbidden functions...")
 forbidden = check_forbidden_functions(SOURCE)
 if forbidden:
     print(f"❌ Forbidden functions found: {', '.join(forbidden)}")
     sys.exit(1)
-print("✅ No forbidden functions found\n")
+print("✅ No forbidden functions found")
 
-print(f"Compiling {SOURCE}...")
+vprint(f"\nCompiling {SOURCE}...")
 result = subprocess.run(["gcc", "-o", "mini_serv", SOURCE], capture_output=True, text=True)
 if result.returncode != 0:
     print("❌ Compilation failed:")
@@ -84,7 +97,7 @@ if result.returncode != 0:
     sys.exit(1)
 with open(SOURCE) as f:
     lines = len(f.readlines())
-print(f"✅ Compiled ({lines} lines)\n")
+print(f"✅ Compiled ({lines} lines)")
 
 def recv_all(sock, timeout=1.0):
     sock.setblocking(0)
@@ -130,8 +143,10 @@ atexit.register(cleanup)
 # ─────────────────────────────────────────────
 # Start server
 # ─────────────────────────────────────────────
-print(f"Starting server on port {PORT}...")
-server = subprocess.Popen([SERVER, str(PORT)])
+vprint(f"\nStarting server on port {PORT}...")
+server = subprocess.Popen([SERVER, str(PORT)],
+                          stdout=(None if VERBOSE else subprocess.DEVNULL),
+                          stderr=(None if VERBOSE else subprocess.DEVNULL))
 
 def connect_with_retry(sock, addr, max_retries=10, delay=0.1):
     for i in range(max_retries):
@@ -201,6 +216,7 @@ if "client 1:" in out and "EOF" in out:
 else:
     print(f"⚠ EOF handling unclear, got: {out[:100]}")
 
+
 # ─────────────────────────────────────────────
 # Empty lines test
 # ─────────────────────────────────────────────
@@ -218,15 +234,15 @@ try:
     c2.sendall(long_line)
     time.sleep(0.5)
     out = recv_all(c1)
-    print("\nℹ Long-line test (5KB) output (may be truncated or crash if server buffer exceeded):")
-    print(out[:500] + ("..." if len(out) > 500 else ""))
+    vprint("\nℹ Long-line test (5KB) output (may be truncated or crash if server buffer exceeded):")
+    vprint(out[:500] + ("..." if len(out) > 500 else ""))
 except Exception as e:
     print("\n⚠ Long-line test (5KB) exception (informative only):", e)
 
 # ─────────────────────────────────────────────
 # VERY LARGE message test (Test 8 style - 100KB+)
 # ─────────────────────────────────────────────
-print("\n--- Testing VERY LARGE messages (like Test 8) ---")
+vprint("\n--- Testing VERY LARGE messages (like Test 8) ---")
 
 # Test with 100KB message
 large_size = 100000
@@ -242,7 +258,7 @@ try:
         # Check if we got partial data
         if "client 1: B" in out:
             received_bs = out.count('B')
-            print(f"⚠ Partial large message received: {received_bs}/{large_size} B's")
+            vprint(f"⚠ Partial large message received: {received_bs}/{large_size} B's")
             if received_bs < large_size:
                 fail(f"Very large message (100KB) truncated or incomplete")
         else:
@@ -263,7 +279,7 @@ try:
     else:
         if "client 1: C" in out:
             received_cs = out.count('C')
-            print(f"⚠ Partial huge message received: {received_cs}/{huge_size} C's")
+            vprint(f"⚠ Partial huge message received: {received_cs}/{huge_size} C's")
             if received_cs < huge_size:
                 fail(f"Huge message (200KB) truncated or incomplete")
         else:
@@ -284,15 +300,15 @@ try:
     else:
         if "client 1: D" in out:
             received_ds = out.count('D')
-            print(f"⚠ Partial stress message received: {received_ds}/{stress_size} D's")
+            vprint(f"⚠ Partial stress message received: {received_ds}/{stress_size} D's")
             if received_ds < stress_size * 0.9:  # Allow 10% tolerance for stress test
-                print(f"⚠ Stress test (500KB) - only {received_ds}/{stress_size} bytes received (informative)")
+                vprint(f"⚠ Stress test (500KB) - only {received_ds}/{stress_size} bytes received (informative)")
             else:
                 ok(f"Stress test message (500KB) mostly received ({received_ds}/{stress_size})")
         else:
-            print(f"⚠ Stress test (500KB) - message not received (informative only)")
+            vprint(f"⚠ Stress test (500KB) - message not received (informative only)")
 except Exception as e:
-    print(f"⚠ Stress test (500KB) exception (informative only): {e}")
+    vprint(f"⚠ Stress test (500KB) exception (informative only): {e}")
 
 # ─────────────────────────────────────────────
 # Disconnect test
@@ -312,7 +328,7 @@ ok("disconnect handled")
 # ─────────────────────────────────────────────
 # Connect/Disconnect cycling test (fd reuse, ID increment)
 # ─────────────────────────────────────────────
-print("\n--- Testing connect/disconnect cycling (ID should keep incrementing) ---")
+vprint("\n--- Testing connect/disconnect cycling (ID should keep incrementing) ---")
 
 # At this point: c1 is still connected (ID=0), c2 just left (ID=1)
 # New clients should get ID=2, 3, 4...
