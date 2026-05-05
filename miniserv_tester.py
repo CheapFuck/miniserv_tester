@@ -31,6 +31,12 @@ ALLOWED_FUNCTIONS = {
     "send", "socket", "sprintf", "strcat", "strcpy", "strlen", "strstr", "write"
 }
 
+# Standard <sys/select.h> macros used with the allowed select() syscall.
+# These are preprocessor macros, not function calls, so they're not really
+# "functions" — but the regex-based scanner below cannot tell the difference.
+# Whitelist them to avoid false positives.
+SELECT_MACROS = {"FD_ZERO", "FD_SET", "FD_CLR", "FD_ISSET"}
+
 # ─────────────────────────────────────────────
 # Check for forbidden functions
 # ─────────────────────────────────────────────
@@ -53,7 +59,8 @@ def check_forbidden_functions(source_file):
     
     forbidden_found = []
     for func in function_calls:
-        if func not in ALLOWED_FUNCTIONS and func not in c_keywords and func not in user_functions:
+        if (func not in ALLOWED_FUNCTIONS and func not in SELECT_MACROS
+                and func not in c_keywords and func not in user_functions):
             if func not in forbidden_found:
                 forbidden_found.append(func)
     
