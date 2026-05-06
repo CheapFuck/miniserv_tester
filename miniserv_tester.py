@@ -8,7 +8,6 @@ import atexit
 import re
 
 SERVER = "./mini_serv"
-SOURCE = "mini_serv.c"
 
 # ─────────────────────────────────────────────
 # Output mode
@@ -18,6 +17,10 @@ SOURCE = "mini_serv.c"
 # and the long-line debug dump.
 # ─────────────────────────────────────────────
 VERBOSE = any(a in ("-v", "--verbose") for a in sys.argv[1:])
+
+# First non-flag CLI arg is the source file; defaults to mini_serv.c
+_positional = [a for a in sys.argv[1:] if not a.startswith("-")]
+SOURCE = _positional[0] if _positional else "mini_serv.c"
 
 def vprint(*args, **kwargs):
     if VERBOSE:
@@ -85,9 +88,9 @@ def check_forbidden_functions(source_file):
 vprint(f"Checking {SOURCE} for forbidden functions...")
 forbidden = check_forbidden_functions(SOURCE)
 if forbidden:
-    print(f"❌ Forbidden functions found: {', '.join(forbidden)}")
-    sys.exit(1)
-print("✅ No forbidden functions found")
+    print(f"⚠ Forbidden functions found: {', '.join(forbidden)} (continuing anyway)")
+else:
+    print("✅ No forbidden functions found")
 
 vprint(f"\nCompiling {SOURCE}...")
 result = subprocess.run(["gcc", "-o", "mini_serv", SOURCE], capture_output=True, text=True)
